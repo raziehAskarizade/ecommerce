@@ -1,33 +1,35 @@
 from rest_framework import serializers
 from django.contrib.auth import authenticate
-from .models import Profile, Address, UserPicture
+from .models import Profile, UserPictureAddress
 from django.contrib.auth import get_user_model
 from order.serializers import OrderSerializer
 
 User = get_user_model()
 
 
-class AddressSerializer(serializers.Serializer):
-    class Meta:
-        model = Address
-        fields = '__all__'
-
-
-class ImageSerializer(serializers.Serializer):
+class ImageAddressSerializer(serializers.Serializer):
     user_profile = serializers.ImageField(required=False, use_url=True)
     user_signature = serializers.ImageField(required=False, use_url=True)
+    address = serializers.CharField()
+    city = serializers.CharField()
+    postal_code = serializers.CharField(max_length=10, min_length=10)
+    country = serializers.CharField()
+    user = serializers.IntegerField(required=False)
 
     class Meta:
-        model = UserPicture
-        fields = ('user_profile', 'user_signature')
+        model = UserPictureAddress
+        fields = ('user_profile', 'user_signature', 'country', 'city', 'postal_code', 'address',)
 
     def create(self, validated_data):
-        user = UserPicture.objects.create(**validated_data)
+        user = UserPictureAddress.objects.create(**validated_data)
         return user
 
     def update(self, instance, validated_data):
         instance.user_profile = validated_data.get('user_profile', instance.user_profile)
         instance.user_signature = validated_data.get('user_signature', instance.user_signature)
+        instance.user_signature = validated_data.get('country', instance.country)
+        instance.user_signature = validated_data.get('city', instance.city)
+        instance.user_signature = validated_data.get('postal_code', instance.postal_code)
         instance.save()
         return instance
 
@@ -39,8 +41,7 @@ class ProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = Profile
         fields = (
-            'national_code', 'pictures', 'first_name', 'last_name', 'phone', 'address', 'order',
-            'address',)
+            'national_code', 'pic_add', 'first_name', 'last_name', 'phone', 'order',)
 
 
 class CreateUserSerializer(serializers.ModelSerializer):

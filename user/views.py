@@ -1,5 +1,4 @@
 from datetime import timezone
-from .signals import user_change_phone
 from rest_framework import permissions, generics, status
 from rest_framework.response import Response
 from django.contrib.auth import login
@@ -8,13 +7,14 @@ from knox.views import LoginView as KnoxLoginView
 from .utils import otp_generator
 from .serializers import (CreateUserSerializer, ChangePasswordSerializer,
                           UserSerializer, LoginUserSerializer, ForgetPasswordSerializer, ProfileSerializer,
-                          ImageSerializer)
-from .models import User, PhoneOTP, Profile, UserPicture
+                          ImageAddressSerializer)
+from .models import User, PhoneOTP, Profile, UserPictureAddress
 from django.shortcuts import get_object_or_404
 from django.db.models import Q
 import itertools
 from rest_framework.views import APIView
 from knox.models import AuthToken
+from django.db.models.signals import pre_save
 
 
 class LoginAPI(KnoxLoginView):
@@ -88,64 +88,6 @@ class ChangePasswordAPI(generics.UpdateAPIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-class EditProfile(APIView):
-    authentication_classes = (TokenAuthentication,)
-    permission_classes = [permissions.IsAuthenticatedOrReadOnly, ]
-    serializer_class = ProfileSerializer
-    serializer_im = ImageSerializer
-
-    def get_object(self, queryset=None):
-        """
-        Returns current logged in user instance
-        """
-        obj = self.request.user
-        return obj
-
-    def get(self, request, *args, **kwargs):
-        self.object = self.get_object()
-        profile = Profile.objects.get(user=self.object)
-        id = str(profile.pictures)
-        serialize = self.serializer_class(profile)
-        if id == 'None':
-            return Response(serialize.data)
-        pictures = get_object_or_404(UserPicture, id=int(str(id)))
-        serializer_im = self.serializer_im(pictures)
-        finally_response = {**serialize.data, **serializer_im.data}
-        return Response(finally_response)
-
-    def post(self, request, *args, **kwargs):
-        self.object = self.get_object()
-        serializer = self.serializer_class(data=dict(itertools.islice(request.data.items(), 6)))
-        serializer_im = self.serializer_im(data=dict(dict(list(request.data.items())[5:8])))
-        if serializer.is_valid() and serializer_im.is_valid():
-            serializer_im.save()
-            data = serializer_im.save()
-            user_pic = UserPicture.objects.create(user_signature=data.user_signature,
-                                                  user_profile=data.user_profile)
-            profile = get_object_or_404(Profile, user=self.object)
-            if profile is not None:
-                profile = Profile.objects.filter(user=self.object)
-                try:
-                    instance = {'user': self.object, 'phone': serializer.data.get('phone'),
-                                'name': serializer.data.get('first_name')}
-                    user_change_phone(sender=profile.first(), instance=instance)
-                except Exception:
-                    return Response({'detail': 'this phone number is exist'}, status=status.HTTP_400_BAD_REQUEST)
-                profile.update(
-                    user=self.object,
-                    first_name=serializer.data.get('first_name'),
-                    last_name=serializer.data.get('last_name'),
-                    national_code=serializer.data.get('national_code'),
-                    pictures=int(str(user_pic)),
-                    phone=serializer.data.get('phone'),
-                    address=serializer.data.get('address'),
-                )
-                return Response({'detail': 'updated'}, status=status.HTTP_200_OK)
-            return Response({'detail': 'user authentication with user profile doesnt match'},
-                            status=status.HTTP_400_BAD_REQUEST)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-
 ######################################
 
 
@@ -208,7 +150,92 @@ def phone_validate_in_classes(phone, otp):
     return Response({'detail': 'otp sent!'}, status=status.HTTP_200_OK)
 
 
+def class_user_object(user, data):
+    serializer = ImageAddressSerializer
+    serializer = serializer(data=dict(dict(list(data.data.items())[5:])))
+    pic_add = 0
+    if serializer.is_valid():
+        data = serializer.save()
+
+    # if user.pic_add is not None:
+    #     pic_add = UserPictureAddress.objects.filter(id=int(str(user.pic_add))).update(
+    #         user_signature=data.user_signature,
+    #         user_profile=data.user_profile,
+    #         address=data.address,
+    #         city=data.city,
+    #         postal_code=data.postal_code,
+    #         country=data.country)
+    # else:
+    #     pic_add = UserPictureAddress.objects.create(user_signature=data.user_signature,
+    #                                                 user_profile=data.user_profile, address=data.address,
+    #                                                 city=data.city,
+    #                                                 postal_code=data.postal_code, country=data.country)
+    if pic_add == 0:
+        return data
+    return pic_add
+
+
+def user_change_phone(sender, instance, *args, **kwargs):
+    user = User.objects.filter(phone=instance.get('user'))
+    if user.first() is not None and user.first() != instance.get('user'):
+        raise Exception('same phone number')
+    User.objects.filter(phone=instance.get('user')).update(phone=instance.get('phone'), name=instance.get('first_name'))
+
+
 ######################################
+
+
+class EditProfile(APIView):
+    authentication_classes = (TokenAuthentication,)
+    permission_classes = [permissions.IsAuthenticatedOrReadOnly, ]
+    serializer_class = ProfileSerializer
+    serializer_im_add = ImageAddressSerializer
+
+    def get_object(self, queryset=None):
+        """
+        Returns current logged in user instance
+        """
+        obj = self.request.user
+        return obj
+
+    def get(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        profile = Profile.objects.get(user=self.object)
+        serialize = self.serializer_class(profile)
+        pic_add = get_object_or_404(UserPictureAddress, id=int(str(profile.pic_add)))
+        serializer_im_add = self.serializer_im_add(pic_add)
+        finally_response = {**serialize.data, **serializer_im_add.data}
+        return Response(finally_response)
+
+    def post(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        serializer = self.serializer_class(data=dict(itertools.islice(request.data.items(), 4)))
+        if serializer.is_valid():
+            profile = get_object_or_404(Profile, user=self.object)
+            if profile is not None:
+                profile = Profile.objects.filter(user=self.object)
+                user_obj = class_user_object(profile.first(), request)
+                try:
+                    instance = {'user': self.object, 'phone': serializer.data.get('phone'),
+                                'name': serializer.data.get('first_name')}
+                    user_change_phone(sender=profile, instance=instance)
+                except Exception:
+                    return Response({'detail': 'this phone number is exist'}, status=status.HTTP_400_BAD_REQUEST)
+                profile.update(
+                    user=self.object,
+                    first_name=serializer.data.get('first_name'),
+                    last_name=serializer.data.get('last_name'),
+                    national_code=serializer.data.get('national_code'),
+                    pic_add=user_obj,
+                    phone=serializer.data.get('phone'),
+                )
+                return Response({'detail': 'updated'}, status=status.HTTP_200_OK)
+            return Response({'detail': 'user authentication with user profile doesnt match'},
+                            status=status.HTTP_400_BAD_REQUEST)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+pre_save.connect(receiver=user_change_phone, sender=EditProfile)
 
 
 class ValidatePhoneSendOTP(APIView):
@@ -259,6 +286,7 @@ class ValidateOTP(APIView):
 
 
 class Register(generics.GenericAPIView):
+    serializer_class = CreateUserSerializer
     '''Takes phone and a password and creates a new user only if otp was verified and phone is new'''
 
     def post(self, request, *args, **kwargs):
@@ -274,7 +302,7 @@ class Register(generics.GenericAPIView):
                 if old.exists():
                     if old.first().validated:
                         temp_data = {'phone': phone, 'password': password}
-                        serializer = CreateUserSerializer(data=temp_data)
+                        serializer = self.serializer_class(data=temp_data)
                         serializer.is_valid(raise_exception=True)
                         user = serializer.save()
                         user.save()

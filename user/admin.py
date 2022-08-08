@@ -6,13 +6,12 @@ from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 
 from .forms import UserAdminCreationForm, UserAdminChangeForm
 
-from .models import Profile, PhoneOTP, Address, UserPicture
+from .models import Profile, PhoneOTP, UserPictureAddress
 
 User = get_user_model()
 admin.site.register(PhoneOTP)
 admin.site.register(Profile)
-admin.site.register(Address)
-admin.site.register(UserPicture)
+admin.site.register(UserPictureAddress)
 
 
 class ProfileInline(admin.StackedInline):

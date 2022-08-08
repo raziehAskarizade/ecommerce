@@ -20,6 +20,7 @@ INSTALLED_APPS = [
     'user.apps.UserConfig',
     'rest_framework',
     'knox',
+    'rest_framework_swagger',
 
     'django.contrib.admin',
     'django.contrib.auth',
@@ -109,6 +110,7 @@ MEDIA_ROOT = os.path.join(os.path.dirname(BASE_DIR), 'mediafiles')
 REST_FRAMEWORK = {
     'NON_FILED_ERRORS_KEY': 'error',
     'DEFAULT_AUTHENTICATION_CLASSES': ('knox.auth.TokenAuthentication',),
+    'DEFAULT_SCHEMA_CLASS': 'rest_framework.schemas.coreapi.AutoSchema',
 }
 
 REST_KNOX = {

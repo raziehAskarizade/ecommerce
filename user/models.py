@@ -130,8 +130,10 @@ class User(AbstractBaseUser):
         return check_password(raw_password, self.password, setter)
 
 
-class Address(models.Model):
+class UserPictureAddress(models.Model):
     id = models.BigAutoField(primary_key=True, editable=False)
+    user_profile = models.ImageField(upload_to=upload_to_profile, null=True, blank=True)
+    user_signature = models.ImageField(upload_to=upload_to_signature, blank=True, null=True)
     address = models.CharField(max_length=200, null=True, blank=True)
     city = models.CharField(max_length=200, null=True, blank=True)
     postal_code = models.CharField(validators=[only_digit, MinLengthValidator(10)], max_length=10)
@@ -141,26 +143,16 @@ class Address(models.Model):
         return str(self.id)
 
 
-class UserPicture(models.Model):
-    id = models.BigAutoField(primary_key=True, editable=False)
-    user_profile = models.ImageField(upload_to=upload_to_profile, null=True, blank=True)
-    user_signature = models.ImageField(upload_to=upload_to_signature, blank=True, null=True)
-
-    def __str__(self):
-        return str(self.id)
-
-
 class Profile(models.Model):
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     national_code = models.CharField(validators=[only_digit, MinLengthValidator(10)], max_length=10)
-    pictures = models.OneToOneField(UserPicture, on_delete=models.SET_NULL, null=True, blank=True)
+    pic_add = models.OneToOneField(UserPictureAddress, on_delete=models.SET_NULL, null=True, blank=True)
     first_name = models.CharField(max_length=50)
     last_name = models.CharField(max_length=50)
     phone_regex = RegexValidator(regex=r'^\+?1?\d{9,14}$',
                                  message="Phone number must be entered in the format: '+999999999'. Up to 13 digits "
                                          "allowed.")
     phone = models.CharField(validators=[phone_regex], max_length=15, blank=True, null=True)
-    address = models.ForeignKey(Address, on_delete=models.SET_NULL, null=True, blank=True)
     order = models.ForeignKey(ListOrder, on_delete=models.SET_NULL, null=True, blank=True)
 
     def __str__(self):
