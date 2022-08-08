@@ -157,19 +157,6 @@ def class_user_object(user, data):
     if serializer.is_valid():
         data = serializer.save()
 
-    # if user.pic_add is not None:
-    #     pic_add = UserPictureAddress.objects.filter(id=int(str(user.pic_add))).update(
-    #         user_signature=data.user_signature,
-    #         user_profile=data.user_profile,
-    #         address=data.address,
-    #         city=data.city,
-    #         postal_code=data.postal_code,
-    #         country=data.country)
-    # else:
-    #     pic_add = UserPictureAddress.objects.create(user_signature=data.user_signature,
-    #                                                 user_profile=data.user_profile, address=data.address,
-    #                                                 city=data.city,
-    #                                                 postal_code=data.postal_code, country=data.country)
     if pic_add == 0:
         return data
     return pic_add

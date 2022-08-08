@@ -6,13 +6,12 @@ from django.core.validators import MinValueValidator, MaxValueValidator
 PERCENTAGE_VALIDATOR = [MinValueValidator(0), MaxValueValidator(100)]
 
 sys.path.append(os.path.realpath('.'))
-# from user.models import User
 
 
 class ListOrder(models.Model):
     id = models.BigAutoField(primary_key=True, editable=False)
-    # user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
-    total_price = models.IntegerField()
+    user = models.CharField(max_length=250, null=True)
+    total_price = models.FloatField()
     is_accept = models.BooleanField(default=False)
 
     def __str__(self):
