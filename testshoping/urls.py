@@ -8,6 +8,7 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('', include('user.urls')),
     path('order/', include('order.urls')),
+    path('push/', include('pushnotif.urls')),
     path('api-auth/', include('rest_framework.urls')),
     path('docs/', include_docs_urls(title='Shopping test')),
 ]

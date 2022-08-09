@@ -21,6 +21,8 @@ INSTALLED_APPS = [
     'rest_framework',
     'knox',
     'rest_framework_swagger',
+    'webpush',
+    'pushnotif.apps.PushnotifConfig',
 
     'django.contrib.admin',
     'django.contrib.auth',
@@ -116,4 +118,10 @@ REST_FRAMEWORK = {
 REST_KNOX = {
     'USER_SERIALIZER': 'user.serializers.UserSerializer',
     'TOKEN_TTL': timedelta(hours=24)
+}
+
+WEBPUSH_SETTINGS = {
+    "VAPID_PUBLIC_KEY": "Vapid Public Key",
+    "VAPID_PRIVATE_KEY": "Vapid Private Key",
+    "VAPID_ADMIN_EMAIL": "admin@example.com"
 }
