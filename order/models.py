@@ -7,12 +7,17 @@ PERCENTAGE_VALIDATOR = [MinValueValidator(0), MaxValueValidator(100)]
 
 sys.path.append(os.path.realpath('.'))
 
+CHOICES = [('old', 'received'), ('new', 'completing'), ('future', 'after_new'), ]
+
 
 class ListOrder(models.Model):
     id = models.BigAutoField(primary_key=True, editable=False)
     user = models.CharField(max_length=250, null=True)
     total_price = models.FloatField()
     is_accept = models.BooleanField(default=False)
+    is_received = models.BooleanField(default=False)
+    choices = models.CharField(choices=CHOICES, default='new', max_length=100)
+    date_submitted = models.DateField(auto_now=True, editable=True)
 
     def __str__(self):
         return str(self.id)

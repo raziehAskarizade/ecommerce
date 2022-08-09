@@ -1,45 +1,30 @@
-from django.http import HttpResponseRedirect
-from rest_framework.decorators import api_view, permission_classes
+import datetime
+import json
+
+import pandas as pd
+from django.shortcuts import get_object_or_404
+from knox.auth import TokenAuthentication
+from persiantools.jdatetime import JalaliDate
+from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from .models import ListOrder, OrderItem
-from rest_framework import status
-from .serializers import OrderSerializer, OrderItemSerializer
-from django.shortcuts import get_object_or_404
-from .signals import add_list_order_to_profile
-from knox.auth import TokenAuthentication
+from rest_framework.reverse import reverse
 from rest_framework.views import APIView
 from user.models import Profile
-import json
-import pandas as pd
+
+from .models import ListOrder, OrderItem
+from .serializers import OrderSerializer, OrderItemSerializer
+from .signals import add_list_order_to_profile
 
 
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
-def deleterOrderId(request, id_):
-    orderItem = get_object_or_404(OrderItem, id=id_)
-    # quantity = orderItem.quantity
-    # count = request.data
-    # count = count['count']
-    # count += quantity
-    OrderItem.objects.get(id=id_).delete()
-    return HttpResponseRedirect(redirect_to='http://127.0.0.1:8000/order/myorders/')
-
-
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def orderId(request, id_):
-    try:
-        user = request.user
-        order = ListOrder.objects.get(id=id_)
-
-        if user.is_staff or order.user == user:
-            serializer = OrderSerializer(order, many=False)
-            return Response(serializer.data)
-        else:
-            return Response({'detail': 'مجوز صادر نشد'}, status=status.HTTP_400_BAD_REQUEST)
-    except:
-        return Response({'detail': 'سفارش موجود نیست'}, status=status.HTTP_404_NOT_FOUND)
+def change_date(order):
+    year = order.date_submitted.year
+    month = order.date_submitted.month
+    day = order.date_submitted.day
+    if year > 2020:
+        iran_calender = JalaliDate(datetime.date(year, month, day))
+        return str(iran_calender)
+    return str(order.date_submitted)
 
 
 class Order(APIView):
@@ -78,8 +63,8 @@ class Order(APIView):
                     user=self.objects.phone,
                     total_price=data['total_price'],
                 )
+            changed_date = change_date(order)
             add_list_order_to_profile(order, order)
-
         for all_orders in orderItem:
             try:
                 OrderItem.objects.filter(list_order=order, id_product=all_orders['id_product']).update(
@@ -94,4 +79,38 @@ class Order(APIView):
                     quantity=all_orders['quantity'],
                     price=all_orders['price']
                 )
+        order = ListOrder.objects.filter(user=self.objects.phone).update(date_submitted=changed_date)
         return self.get(request)
+
+
+class OrderId(APIView):
+    authentication_classes = (TokenAuthentication,)
+    permission_classes = (IsAuthenticated,)
+    serializer_class = OrderSerializer
+    serializer_item = OrderItemSerializer
+
+    def get(self, request, id_):
+        try:
+            user = request.user
+            order = ListOrder.objects.get(id=id_)
+            if user.is_staff or order.user == user.phone:
+                serializer = self.serializer_class(order)
+                order_items = OrderItem.objects.filter(list_order=order.id)
+                orders_serializer = self.serializer_item(order_items, many=True)
+                orders_serializer = json.loads(json.dumps(orders_serializer.data))
+                orders_serializer = pd.DataFrame(orders_serializer).to_dict()
+                finally_response = {**orders_serializer, **dict(serializer.data)}
+                return Response(finally_response)
+            else:
+                return Response({'detail': 'مجوز صادر نشد'}, status=status.HTTP_400_BAD_REQUEST)
+        except:
+            return Response({'detail': 'سفارش موجود نیست'}, status=status.HTTP_404_NOT_FOUND)
+
+    def delete(self, request, id_):
+        orderItem = get_object_or_404(OrderItem, id_product=id_)
+        OrderItem.objects.get(id_product=id_).delete()
+        order = ListOrder.objects.get(user=request.user.phone)
+        changed_date = change_date(order)
+        ListOrder.objects.filter(user=request.user.phone).update(date_submitted=changed_date)
+        data = {'orders': reverse('orders', request=request)}
+        return Response(data)
